@@ -1,7 +1,7 @@
 import threading
 
 from textual.app import App, ComposeResult
-from textual.widgets import Static, Input
+from textual.widgets import Static, Input, Markdown
 from textual.containers import VerticalScroll
 
 from localLLM import ollama
@@ -16,9 +16,11 @@ class ChatUI(App):
             'conversation': []
         }
 
+        self.chat_buffer = 'How may I help you today... or tonight?'
+
     def compose(self) -> ComposeResult:
         yield VerticalScroll(
-            Static('How may I help you today... or tonight?', id='conversation')
+            Markdown(self.chat_buffer, id='conversation')
         )
 
         
@@ -32,14 +34,13 @@ class ChatUI(App):
         if not user_text:
             return
 
-        self.query_one('#input-box').value = ""
+        self.query_one("#input-box").value = ""
 
-        convo = self.query_one("#conversation", Static)
+        # maintain your own conversation buffer (init this earlier in your class)
+        self.chat_buffer += f"\n\n**You:** {user_text}\n\n"
 
-        old = convo.content or ''
-        new_text = f'{old}\nYou: {user_text}'
-
-        convo.update(new_text)
+        convo: Markdown = self.query_one("#conversation", Markdown)
+        convo.update(self.chat_buffer)
 
         self.cli_state['conversation'].append({'role': 'user', 'content': user_text})
 
@@ -47,14 +48,15 @@ class ChatUI(App):
             scroll = self.query_one(VerticalScroll)
             scroll.scroll_end(animate=False)
 
-        base_content = convo.content
+        prefix = "\n\n**AI:** "
+
+        spinner_running = True
         frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
         i = 0
-        spinner_running = True
 
         def spin():
             nonlocal i
-            convo.update(f'{base_content}\nAI: {frames[i % len(frames)]}')
+            convo.update(self.chat_buffer + "**AI:**" + frames[i % len(frames)])
             i += 1
 
         spin_timer = self.set_interval(0.1, spin)
@@ -68,30 +70,23 @@ class ChatUI(App):
                 stream=True,
             )
 
-            prefix = '\nAI: '
-
-            full_response = ""
+            full_response = ''
 
             for chunk in stream:
                 if spinner_running:
+                    self.chat_buffer += f" **AI:** "
                     spin_timer.stop()
-                    self.call_from_thread(convo.update, f'{base_content}{prefix}')
-
                     spinner_running = False
-                
-                if 'content' in chunk['message']:
-                    text = chunk['message']['content']
-                    if not text:
-                        continue
 
-                    full_response += text
+                text = chunk['message'].get("content", "")
 
-                    self.call_from_thread(
-                        convo.update,
-                        f"{convo.content}{text}"
-                    )
+                full_response += text
 
-                    self.call_from_thread(scroll_end)
+                # append to buffer & update widget
+                self.chat_buffer += text
+                self.call_from_thread(convo.update, self.chat_buffer)
+                self.call_from_thread(scroll_end)
+
             self.cli_state['conversation'].append({
                 'role': 'assistant',
                 'content': full_response
