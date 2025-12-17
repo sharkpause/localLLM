@@ -11,7 +11,7 @@ DUMP_DIR = "wiki_dump"          # folder with dumped HTML files
 CHUNK_SIZE = 200                # smaller chunks to avoid embed limits
 COLLECTION_NAME = "wiki_rag"
 EMBED_MODEL = "nomic-embed-text:latest"
-MAX_FILES=1000
+MAX_FILES=10000
 
 # ---------- INIT ----------
 ollama = Client()
