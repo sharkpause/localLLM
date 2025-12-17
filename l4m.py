@@ -47,7 +47,21 @@ class ChatUI(App):
             scroll = self.query_one(VerticalScroll)
             scroll.scroll_end(animate=False)
 
+        base_content = convo.content
+        frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
+        i = 0
+        spinner_running = True
+
+        def spin():
+            nonlocal i
+            convo.update(f'{base_content}\nAI: {frames[i % len(frames)]}')
+            i += 1
+
+        spin_timer = self.set_interval(0.1, spin)
+
         def stream_response():
+            nonlocal spinner_running
+
             stream = ollama.chat(
                 model=self.cli_state['model_name'],
                 messages=self.cli_state['conversation'],
@@ -55,10 +69,16 @@ class ChatUI(App):
             )
 
             prefix = '\nAI: '
-            self.call_from_thread(convo.update, f'{convo.content}{prefix}')
+
             full_response = ""
 
             for chunk in stream:
+                if spinner_running:
+                    spin_timer.stop()
+                    self.call_from_thread(convo.update, f'{base_content}{prefix}')
+
+                    spinner_running = False
+                
                 if 'content' in chunk['message']:
                     text = chunk['message']['content']
                     if not text:
@@ -72,7 +92,13 @@ class ChatUI(App):
                     )
 
                     self.call_from_thread(scroll_end)
+            self.cli_state['conversation'].append({
+                'role': 'assistant',
+                'content': full_response
+            })
+
         threading.Thread(target=stream_response, daemon=True).start()
+
 
 if __name__ == "__main__":
     app = ChatUI()
