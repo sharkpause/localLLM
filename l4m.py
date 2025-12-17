@@ -54,10 +54,17 @@ class ChatUI(App):
             self.call_from_thread(convo.update, f'{convo.content}{prefix}')
             full_response = ""
 
+            spinner_frames = ["|", "/", "–", "\\"]
+            spinner_index = 0
+
             for chunk in stream:
                 if 'content' in chunk['message']:
                     text = chunk['message']['content']
                     if not text:
+                        frame = spinner_frames[spinner_index % len(spinner_frames)]
+                        spinner_index += 1
+                        self.call_from_thread(convo.update, f'{convo.content}hm...{frame}')
+
                         continue
 
                     full_response += text
