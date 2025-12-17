@@ -14,10 +14,6 @@ import os
 import time
 import threading
 
-from textual.app import App, ComposeResult
-from textual.widgets import Input, TextLog
-from textual.containers import Vertical
-
 logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
 
 ollama = Client()
@@ -33,22 +29,9 @@ def embed_text(text: str):
     return np.array(e.embeddings[0])
 
 def retrieve_context(query: str, k=5):
-    stop_event = threading.Event()
-    t = threading.Thread(
-        target=thinking_animation,
-        args=(
-            ['retrieving documents.', 'retrieving documents..', 'retrieving documents...'],
-            stop_event,
-        )
-    )
-    t.start()
-    
     query_vec = embed_text(query)
     results = collection.query(query_embeddings=[query_vec.tolist()], n_results=k)
     docs = results["documents"][0]
-
-    stop_event.set()
-    t.join()
 
     return "\n".join(docs)
 
@@ -82,15 +65,6 @@ def ask_rag(prompt: str, model_name: str):
 
     ask(contexted_prompt, model_name)
 
-def thinking_animation(frames, stop_event):
-    i = 0
-
-    while not stop_event.is_set():
-        print(f'\r{frames[i % len(frames)]}', end='', flush=True)
-        i += 1
-        time.sleep(0.5)
-        print('\r' + ' '* 20 + '\r', end='')
-
 def load_persistent_memory(cli_state):
     MEMORY_FILE = 'preprompt.txt'
     try:
@@ -109,7 +83,7 @@ def save_cli_state(cli_state):
         return
 
     file_prefix = cli_state['conversation'][1]['content'][0:5].strip()
-    file_prefix.replace('"', '').replace("'", "")
+    file_prefix = file_prefix.replace('"', '').replace("'", "")
     file_prefix = re.sub(r'[^a-zA-Z0-9_-]', '_', file_prefix.strip())
 
     file_name = datetime.now().strftime(
@@ -160,35 +134,28 @@ def handle_command(chain, model_name, cli_state, query=None):
                     cli_state['model_name'] = query.strip()
                     print(f'Model changed to: {cli_state['model_name']}')
 
-COMMAND_PREFIX = '\\'
+# print(textwrap.dedent(f'''
+# CLI Local LLM, type "{COMMAND_PREFIX}" following a command to execute a command.
+# It must be the first character.\n
+# Example: \\h for help.\n\n
+# Current model: {cli_state["model_name"]}'''))
 
-cli_state = {
-    'model_name': 'gemma3:1b',
-    'conversation': []
-}
+# load_persistent_memory(cli_state)
 
-print(textwrap.dedent(f'''
-CLI Local LLM, type "{COMMAND_PREFIX}" following a command to execute a command.
-It must be the first character.\n
-Example: \\h for help.\n\n
-Current model: {cli_state['model_name']}'''))
-
-load_persistent_memory(cli_state)
-
-while True:
-    try:
-        user_input = input("You> ")
-
-        if user_input.startswith(COMMAND_PREFIX):
-            chain = user_input[len(COMMAND_PREFIX):]
-            parts = chain.split(maxsplit=1)
-            commands = parts[0]
-            query = parts[1] if len(parts) > 1 else None
-            handle_command(commands, cli_state['model_name'], cli_state, query)
-        else:
-            ask(user_input, cli_state['model_name'])
-            print('\n')
-    except KeyboardInterrupt:
-        save_cli_state(cli_state)
-        print('\nBye bye!')
-        exit(0)
+#while True:
+#    try:
+#        user_input = input("You> ")
+#
+#        if user_input.startswith(COMMAND_PREFIX):
+#            chain = user_input[len(COMMAND_PREFIX):]
+#            parts = chain.split(maxsplit=1)
+#            commands = parts[0]
+#            query = parts[1] if len(parts) > 1 else None
+#            handle_command(commands, cli_state['model_name'], cli_state, query)
+#        else:
+#            ask(user_input, cli_state['model_name'])
+#            print('\n')
+#    except KeyboardInterrupt:
+#        save_cli_state(cli_state)
+#        print('\nBye bye!')
+#        exit(0)
