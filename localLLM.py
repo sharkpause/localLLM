@@ -7,6 +7,7 @@ import logging
 
 import textwrap
 
+import os
 import time
 import threading
 
@@ -89,6 +90,18 @@ cli_state = {
     'model_name': 'gemma3:1b',
     'conversation': []
 }
+
+MEMORY_FILE = 'preprompt.txt'
+
+try:
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
+            cli_state['conversation'].append({
+                'role': 'system',
+                'content': f.read()
+            })
+except:
+    print('Tip: You can write a preprompt in a preprompt.txt file for persistent memory!')
 
 def handle_command(chain, model_name, query=None):
     for command in chain.lower():
