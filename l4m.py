@@ -43,6 +43,10 @@ class ChatUI(App):
 
         self.cli_state['conversation'].append({'role': 'user', 'content': user_text})
 
+        def scroll_end():
+            scroll = self.query_one(VerticalScroll)
+            scroll.scroll_end(animate=False)
+
         def stream_response():
             stream = ollama.chat(
                 model=self.cli_state['model_name'],
@@ -54,17 +58,10 @@ class ChatUI(App):
             self.call_from_thread(convo.update, f'{convo.content}{prefix}')
             full_response = ""
 
-            spinner_frames = ["|", "/", "–", "\\"]
-            spinner_index = 0
-
             for chunk in stream:
                 if 'content' in chunk['message']:
                     text = chunk['message']['content']
                     if not text:
-                        frame = spinner_frames[spinner_index % len(spinner_frames)]
-                        spinner_index += 1
-                        self.call_from_thread(convo.update, f'{convo.content}hm...{frame}')
-
                         continue
 
                     full_response += text
@@ -74,9 +71,7 @@ class ChatUI(App):
                         f"{convo.content}{text}"
                     )
 
-                    scroll = self.query_one(VerticalScroll)
-                    self.call_from_thread(scroll.scroll_end, animate=False)
-
+                    self.call_from_thread(scroll_end)
         threading.Thread(target=stream_response, daemon=True).start()
 
 if __name__ == "__main__":
