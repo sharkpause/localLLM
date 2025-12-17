@@ -6,12 +6,17 @@ import numpy as np
 import logging
 
 import textwrap
+import json
+from datetime import datetime
+import re
 
 import os
 import time
 import threading
 
-from pydantic.v1 import NoneIsAllowedError
+from textual.app import App, ComposeResult
+from textual.widgets import Input, TextLog
+from textual.containers import Vertical
 
 logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
 
@@ -86,27 +91,50 @@ def thinking_animation(frames, stop_event):
         time.sleep(0.5)
         print('\r' + ' '* 20 + '\r', end='')
 
-cli_state = {
-    'model_name': 'gemma3:1b',
-    'conversation': []
-}
+def load_persistent_memory(cli_state):
+    MEMORY_FILE = 'preprompt.txt'
+    try:
+        if os.path.exists(MEMORY_FILE):
+            with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
+                cli_state['conversation'].append({
+                    'role': 'system',
+                    'content': f.read()
+                })
+    except:
+        print('Tip: You can write a preprompt in a preprompt.txt file for persistent memory!')
 
-MEMORY_FILE = 'preprompt.txt'
+def save_cli_state(cli_state):
+    HISTORY_DIRECTORY="chat_history"
+    if len(cli_state['conversation']) < 1:
+        return
 
-try:
-    if os.path.exists(MEMORY_FILE):
-        with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
-            cli_state['conversation'].append({
-                'role': 'system',
-                'content': f.read()
-            })
-except:
-    print('Tip: You can write a preprompt in a preprompt.txt file for persistent memory!')
+    file_prefix = cli_state['conversation'][1]['content'][0:5].strip()
+    file_prefix.replace('"', '').replace("'", "")
+    file_prefix = re.sub(r'[^a-zA-Z0-9_-]', '_', file_prefix.strip())
 
-def handle_command(chain, model_name, query=None):
+    file_name = datetime.now().strftime(
+        f'{file_prefix}_%Y-%m-%d_%H:%M%S'
+    )
+
+    file_path = os.path.join(HISTORY_DIRECTORY, f'{file_name}.json')
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(cli_state, f, ensure_ascii=False, indent=2)
+            print('\nConversation saved to', file_path)
+    except:
+        print('\nFailed to save conversation to', file_path)
+
+def load_cli_state(file_path):
+    if not os.path.exists(HISTORY_DIR, file_path):
+        return 'Conversation not found'
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def handle_command(chain, model_name, cli_state, query=None):
     for command in chain.lower():
         match command:
             case 'q':
+                save_cli_state(cli_state)
                 print('Bye bye!')
                 exit(0)
             case 'r':
@@ -134,20 +162,33 @@ def handle_command(chain, model_name, query=None):
 
 COMMAND_PREFIX = '\\'
 
+cli_state = {
+    'model_name': 'gemma3:1b',
+    'conversation': []
+}
+
 print(textwrap.dedent(f'''
 CLI Local LLM, type "{COMMAND_PREFIX}" following a command to execute a command.
 It must be the first character.\n
 Example: \\h for help.\n\n
 Current model: {cli_state['model_name']}'''))
-while True:
-    user_input = input("You> ")
 
-    if user_input.startswith(COMMAND_PREFIX):
-        chain = user_input[len(COMMAND_PREFIX):]
-        parts = chain.split(maxsplit=1)
-        commands = parts[0]
-        query = parts[1] if len(parts) > 1 else None
-        handle_command(commands, cli_state['model_name'], query)
-    else:
-        ask(user_input, cli_state['model_name'])
-        print('\n')
+load_persistent_memory(cli_state)
+
+while True:
+    try:
+        user_input = input("You> ")
+
+        if user_input.startswith(COMMAND_PREFIX):
+            chain = user_input[len(COMMAND_PREFIX):]
+            parts = chain.split(maxsplit=1)
+            commands = parts[0]
+            query = parts[1] if len(parts) > 1 else None
+            handle_command(commands, cli_state['model_name'], cli_state, query)
+        else:
+            ask(user_input, cli_state['model_name'])
+            print('\n')
+    except KeyboardInterrupt:
+        save_cli_state(cli_state)
+        print('\nBye bye!')
+        exit(0)

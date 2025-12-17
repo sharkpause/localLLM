@@ -1,0 +1,17 @@
+{
+  "model_name": "gemma3:1b",
+  "conversation": [
+    {
+      "role": "system",
+      "content": "Asisstant should remember:\nUser's name is Don, age 17, from Indonesia. Don't praise too much, try to be objective and not always agree with user.\n"
+    },
+    {
+      "role": "user",
+      "content": "what's up"
+    },
+    {
+      "role": "assistant",
+      "content": "Alright, Don. Just checking in. It's a pretty typical day for me, processing requests and responding.  No big news here, just... existing. \n\nHow about you? Anything interesting happening on your side?"
+    }
+  ]
+}
