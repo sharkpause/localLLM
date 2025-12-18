@@ -1,7 +1,9 @@
 import threading
 from enum import Enum, auto
 
+from textual import events
 from textual.app import App, ComposeResult
+from textual.widget import Widget
 from textual.widgets import Static, Input, Markdown, Label, TextArea, Button
 from textual.containers import VerticalScroll, Horizontal, Container, Vertical
 from textual.binding import Binding
@@ -12,6 +14,55 @@ class InputMode(Enum):
     TYPING = auto()
     SUBMIT = auto()
     SIDEBAR = auto()
+    MODEL_PICKER = auto()
+
+class ModelPicker(Widget):
+    can_focus = True
+
+    def __init__(self, models: list[str], **kwargs):
+        super().__init__(**kwargs)
+        self.models = models
+        self.cursor = 0
+
+    def on_mount(self):
+        self.refresh_list()
+        self.focus()
+
+    def refresh_list(self):
+        for child in list(self.children):
+            child.remove()
+
+        for index, model in enumerate(self.models):
+            debug_log(f'index: {index}')
+            text = model
+            if index == self.cursor:
+                text = f"[reverse]{model}[/reverse]"
+            self.mount(Static(text))
+
+    def move_cursor(self, delta: int):
+        self.cursor = max(0, min(self.cursor + delta, len(self.models) - 1))
+        self.refresh_list()
+
+    def on_key(self, event):
+        try:
+            event.prevent_default()
+        except Exception:
+            pass
+
+        key = event.key
+        debug_log(f"ModelPicker key: {key}")
+        match key:
+            case "up" | "k":
+                self.move_cursor(-1)
+            case "down" | "j":
+                self.move_cursor(1)
+            case "enter":
+                self.app.pick_model(self.selected_model())
+            case "escape":
+                self.app.close_model_picker()
+    
+    def selected_model(self) -> str:
+        return self.models[self.cursor]
 
 class ChatUI(App):
     CSS_PATH = "style.tcss"
@@ -28,24 +79,29 @@ class ChatUI(App):
             { 'role': 'system', 'text': '# How may I help you today... or tonight?' },
         ]
 
+        self.sidebar_items = [
+            'model',
+            'settings',
+            'chats',
+        ]
+
+        self.sidebar_index = 0
+
         self.mode = InputMode.TYPING
 
     def compose(self):
-        self.mode_label = Label("TYPING", id="mode-indicator")
-        self.model_label = Label("gemma3:4b", id="model-indicator")
+        self.sidebar_widgets = {
+            'mode': Static("TYPING", id="mode-indicator"),
+            "model": Static("gemma3:4b", id="sidebar-model"),
+            "settings": Static("Settings", id="sidebar-settings"),
+            "chats": Static("Chats", id="sidebar-chats"),
+        }
 
-        sidebar = Vertical(
-            self.mode_label,
-
-            Static(""),
-            self.model_label,
-
-            Static(""),
-            Static("SETTINGS", classes="sidebar-label"),
-
-            Static(""),
-            Static("CHATS", classes="sidebar-label"),
-            Static("• Default", classes="chat-item"),
+        self.sidebar = Vertical(
+            self.sidebar_widgets['mode'],
+            self.sidebar_widgets['model'],
+            self.sidebar_widgets['settings'],
+            self.sidebar_widgets['chats'],
 
             id="sidebar",
         )
@@ -61,7 +117,7 @@ class ChatUI(App):
         )
 
         yield Horizontal(
-            sidebar,
+            self.sidebar,
             Vertical(
                 self.chat_view,
                 Horizontal(
@@ -75,25 +131,56 @@ class ChatUI(App):
         self.query_one('#input-box').focus()
     
     def on_key(self, event) -> None:
-        if event.key == 'escape':
-            self.update_mode(InputMode.SUBMIT)
-            self.user_textarea.blur()
-            self.update_mode_indicator()
-            event.prevent_default()
+        if self.mode == InputMode.SIDEBAR:
+            match event.key:
+                case 'up' | 'k':
+                    self.move_sidebar_cursor(-1)
+                case 'down' | 'j':
+                    self.move_sidebar_cursor(1)
+                case 'enter':
+                    self.activate_sidebar_item()
+                case 'escape':
+                    self.clear_sidebar_cursor()
+                    self.update_mode(InputMode.SUBMIT)
+                case 't':
+                    self.clear_sidebar_cursor()
+                    self.update_mode(InputMode.TYPING)
 
-            return
+        match event.key:
+            case 'escape':
+                self.change_to_submit(event)
+            case 't':
+                self.change_to_typing(event)
+            case 's':
+                if self.mode != InputMode.TYPING:
+                    self.change_to_sidebar(event)
+            case 'enter':
+                if self.mode == InputMode.SUBMIT:
+                    self.submit_message()
+                    event.prevent_default()
+    
+    def change_to_submit(self, event):
+        self.update_mode(InputMode.SUBMIT)
+        self.user_textarea.blur()
+        self.update_mode_indicator()
+        event.prevent_default()
+        
+        return
+    
+    def change_to_typing(self, event):
+        self.update_mode(InputMode.TYPING)
+        self.user_textarea.focus()
+        self.user_textarea.blur()
+        event.prevent_default()
 
-        if event.key == 't' and self.mode == InputMode.SUBMIT:
-            self.update_mode(InputMode.TYPING)
-            self.user_textarea.focus()
-            self.update_mode_indicator()
-            event.prevent_default()
+        return
 
-            return
+    def change_to_sidebar(self, event):
+        self.update_mode(InputMode.SIDEBAR)
+        self.user_textarea.blur()
 
-        if event.key == "enter" and self.mode == InputMode.SUBMIT:
-            self.submit_message()
-            event.prevent_default()
+        self.sidebar_index = 0
+        self.apply_sidebar_cursor()
 
     def submit_message(self):
         user_text = self.user_textarea.text.strip()
@@ -182,7 +269,7 @@ class ChatUI(App):
         self.update_placeholder()
 
     def update_mode_indicator(self):
-        label = self.mode_label
+        label = self.sidebar_widgets['mode']
 
         match self.mode:
             case InputMode.TYPING:
@@ -191,13 +278,94 @@ class ChatUI(App):
             case InputMode.SUBMIT:
                 label.update('SUBMIT')
                 label.set_classes('submit')
+            case InputMode.SIDEBAR:
+                label.update('SIDEBAR')
+                label.set_classes('sidebar')
+            case InputMode.MODEL_PICKER:
+                label.update('MODEL PICKER')
+                label.set_classes('model-picker')  
     
     def update_placeholder(self):
-        match self.mode:
-            case InputMode.TYPING:
-                self.user_textarea.placeholder = "Type your message…"
-            case InputMode.SUBMIT:
-                self.user_textarea.placeholder = "Press Enter to send, t to edit"
+        if self.mode == InputMode.TYPING:
+            self.user_textarea.placeholder = "Type your message…"
+        else:
+            self.user_textarea.placeholder = "Press Enter to send, t to edit"
+
+    def apply_sidebar_cursor(self):
+        self.clear_sidebar_cursor()
+        key = self.sidebar_items[self.sidebar_index]
+        self.sidebar_widgets[key].add_class("cursor")
+
+    def clear_sidebar_cursor(self):
+        for widget in self.sidebar_widgets.values():
+            widget.remove_class('cursor')
+
+    def move_sidebar_cursor(self, delta: int):
+        self.sidebar_index = (self.sidebar_index + delta) % len(self.sidebar_items)
+        self.apply_sidebar_cursor()
+
+    def activate_sidebar_item(self):
+        item = self.sidebar_items[self.sidebar_index]
+
+        match item:
+            case 'model':
+                self.open_model_picker()
+                self.update_mode(InputMode.MODEL_PICKER)
+    
+    def open_model_picker(self):
+        if getattr(self, "model_picker_popup", None) is not None:
+            return
+
+        if hasattr(self, "sidebar") and self.sidebar is not None:
+            try:
+                self.sidebar.blur()
+            except Exception:
+                pass
+
+        models = []
+        result = ollama.list()
+        if 'models' in result:
+            for model in result['models']:
+                models.append(model.model)
+
+        self.model_picker_popup = Container(
+            ModelPicker(models, id="model-picker"),
+            id="model-picker-container"
+        )
+        self.mount(self.model_picker_popup)
+
+        picker = self.model_picker_popup.query_one(ModelPicker)
+        if picker:
+            try:
+                self.set_focus(picker)
+            except Exception:
+                picker.focus()
+
+        self.update_mode(InputMode.MODEL_PICKER)
+    
+    def close_model_picker(self):
+        popup = getattr(self, "model_picker_popup", None)
+        if not popup:
+            return
+
+        try:
+            popup.remove()
+        except Exception:
+            try:
+                for child in list(popup.children):
+                    child.remove()
+                popup.remove()
+            except Exception:
+                pass
+
+        self.model_picker_popup = None
+
+    def pick_model(self, model_name):
+        self.app_state["model_name"] = model_name
+    
+        self.sidebar_widgets['model'].update(model_name)
+
+        self.close_model_picker()
 
     def render_messages(self, message):
         if message['role'] == "user":

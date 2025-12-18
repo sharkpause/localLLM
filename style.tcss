@@ -33,6 +33,10 @@ VerticalScroll {
     padding-left: 2;
 }
 
+.cursor {
+    background: rgba(255, 255, 255, 0.1);
+}
+
 #input-section {
     height: 30%;
 }
@@ -44,4 +48,20 @@ VerticalScroll {
     margin-bottom: 0;
     margin-left: 1;
     margin-right: 1;
+}
+
+#model-picker-container {
+    width: 50%;
+    height: 40%;
+    border: wide solid #555;
+    background: #111;      /* dark background so it stands out */
+    padding: 1;
+    layer: pop;            /* ensures it floats above other UI */
+    dock: top;         /* makes it float instead of pushing layout */
+    align: center middle;  /* centers it */
+}
+
+#model-picker {
+    width: 100%;
+    height: 100%;
 }
