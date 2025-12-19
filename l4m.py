@@ -45,22 +45,20 @@ class ModelPicker(Widget):
         self.refresh_list()
 
     def on_key(self, event):
-        try:
-            event.prevent_default()
-        except Exception:
-            pass
-
         key = event.key
-        debug_log(f"ModelPicker key: {key}")
+
         match key:
             case "up" | "k":
                 self.move_cursor(-1)
             case "down" | "j":
                 self.move_cursor(1)
             case "enter":
+                # debug_log('Model picker enter')
                 self.app.sidebar.pick_model(self.selected_model())
+                event.stop()
             case "escape":
                 self.app.close_model_picker()
+                event.stop()
     
     def selected_model(self) -> str:
         return self.models[self.cursor]
@@ -121,15 +119,12 @@ class Sidebar(Vertical):
         self.cursor = 0
 
         self.cursor_on = False
-
-        self.model_picker_open = False
+        self.model_picker_popup = None
 
     def on_mount(self):
         self.refresh_list()
 
     def on_focus(self, event):
-        debug_log('Focused')
-        
         if self.app.mode != InputMode.SIDEBAR:
             return
         
@@ -139,15 +134,15 @@ class Sidebar(Vertical):
         mode_classes = []
         match self.mode:
             case 'TYPING':
-                mode_classes.append("typing")
+                mode_classes.append('typing')
             case 'SUBMIT':
-                mode_classes.append("submit")
+                mode_classes.append('submit')
             case 'SIDEBAR':
-                mode_classes.append("sidebar")
+                mode_classes.append('sidebar')
             case 'MODEL_PICKER':
-                mode_classes.append("model-picker")
+                mode_classes.append('model-picker')
             case 'SETTINGS':
-                mode_classes.append("settings")
+                mode_classes.append('settings')
 
         if len(self.children) > 0:
             mode_widget = self.children[0]
@@ -175,7 +170,6 @@ class Sidebar(Vertical):
                 widget.set_classes(item_classes)
                 self.mount(widget)
 
-
     def move_cursor(self, delta: int):
         self.cursor = (self.cursor + delta) % len(self.keys)
 
@@ -191,7 +185,7 @@ class Sidebar(Vertical):
         return self.keys[self.cursor]
 
     def on_key(self, event):
-        if not self.has_focus:
+        if not self.cursor_on:
             return
 
         match event.key:
@@ -200,6 +194,8 @@ class Sidebar(Vertical):
             case "down" | "j":
                 self.move_cursor(1)
             case "enter":
+                debug_log('enter')
+                self.clear_cursor()
                 self.activate_item()
             case "escape":
                 self.clear_cursor()
@@ -215,20 +211,15 @@ class Sidebar(Vertical):
 
         match item:
             case "model":
-                if self.model_picker_open:
+                if self.model_picker_popup:
                     return
 
-                self.model_picker_open = True
                 self.open_model_picker()
+                self.clear_cursor()
             case "settings":
                 self.open_settings()
     
     def open_model_picker(self):
-        if getattr(self, "model_picker_popup", None):
-            return
-
-        self.clear_cursor()
-
         models = [m.model for m in ollama.list().get("models", [])]
 
         self.model_picker_popup = Container(
@@ -253,18 +244,13 @@ class Sidebar(Vertical):
         if not popup:
             return
         try:
-            popup.remove() 
+            popup.remove()
         except Exception:
-            try:
-                for child in list(popup.children):
-                    child.remove()
-                    popup.remove()
-            except Exception:
-                pass
-        
+            for child in list(popup.children):
+                child.remove()
+            popup.remove()
         self.model_picker_popup = None
         self.app.update_mode(InputMode.SIDEBAR)
-        self.model_picker_open = False
 
     def update_model_label(self, model_name: str):
         self.items['model'] = model_name
@@ -323,7 +309,6 @@ class ChatUI(App):
                 Horizontal(self.user_textarea, id="input-section"),
             ),
         )
-
 
     def on_mount(self):
         self.query_one('#input-box').focus()
@@ -475,25 +460,25 @@ class ChatUI(App):
         else:
             self.user_textarea.placeholder = "Press Enter to send, t to edit"
 
-    def open_settings(self):
-        self.sidebar.blur()
+    # def open_settings(self):
+    #     self.sidebar.blur()
 
-        self.settings_popup_container = Container(
-            SettingsPopup(["Quit", "Change Model"]),
-            id="settings-popup-container"
-        )
-        self.mount(self.settings_popup_container)
+    #     self.settings_popup_container = Container(
+    #         SettingsPopup(["Quit", "Change Model"]),
+    #         id="settings-popup-container"
+    #     )
+    #     self.mount(self.settings_popup_container)
 
-        self.set_focus(self.settings_popup_container.query_one(SettingsPopup))
-        self.update_mode(InputMode.SETTINGS)
+    #     self.set_focus(self.settings_popup_container.query_one(SettingsPopup))
+    #     self.update_mode(InputMode.SETTINGS)
 
-    def close_settings(self):
-        if hasattr(self, "settings_popup_container") and self.settings_popup_container:
-            self.settings_popup_container.remove()
-            self.settings_popup_container = None
+    # def close_settings(self):
+    #     if hasattr(self, "settings_popup_container") and self.settings_popup_container:
+    #         self.settings_popup_container.remove()
+    #         self.settings_popup_container = None
 
-        self.set_focus(self.sidebar)
-        self.update_mode(InputMode.SIDEBAR)
+    #     self.set_focus(self.sidebar)
+    #     self.update_mode(InputMode.SIDEBAR)
 
     def render_messages(self, message):
         if message['role'] == "user":
