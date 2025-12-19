@@ -17,15 +17,17 @@ class PrepromptEditor(Screen):
         if PREPROMPT_PATH.exists():
             preprompt_text = PREPROMPT_PATH.read_text(encoding='utf-8')
 
+        self.textarea = TextArea(
+            preprompt_text,
+            id='preprompt-editor'
+        )
+
         yield Vertical(
             Label(
                 'Edit preprompt (Ctrl+S to save, Esc to cancel)',
                 id='preprompt-editor-label'
             ),
-            TextArea(
-                preprompt_text,
-                id='preprompt-editor'
-            ),
+            self.textarea,
             id='preprompt-editor-container'
         )
 
@@ -39,10 +41,8 @@ class PrepromptEditor(Screen):
         match event.key:
             case 'escape':
                 self.dismiss()
-                # self.app.sidebar.close_preprompt_editor(InputMode.SETTINGS)
                 event.stop()
             case 'ctrl+s':
                 self.save()
                 self.dismiss()
-                # self.app.sidebar.close_preprompt_editor(InputMode.SETTINGS)
                 event.stop()
