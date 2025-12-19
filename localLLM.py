@@ -65,7 +65,7 @@ def ask_rag(prompt: str, model_name: str):
 
     ask(contexted_prompt, model_name)
 
-def load_persistent_memory(cli_state):
+def load_preprompt(cli_state):
     MEMORY_FILE = 'preprompt.txt'
     try:
         if os.path.exists(MEMORY_FILE):

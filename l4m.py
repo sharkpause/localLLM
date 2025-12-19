@@ -8,7 +8,7 @@ from textual.widgets import Static, Input, Markdown, Label, TextArea, Button
 from textual.containers import VerticalScroll, Horizontal, Container, Vertical
 from textual.binding import Binding
 
-from localLLM import ollama
+from localLLM import ollama, load_preprompt
 
 from components.debug_log import debug_log
 from components.input_mode import InputMode
@@ -24,6 +24,8 @@ class ChatUI(App):
             'model_name': 'gemma3:4b',
             'conversation': []
         }
+
+        load_preprompt(self.app_state)
 
         self.messages = [
             { 'role': 'system', 'text': '# How may I help you today... or tonight?' },
