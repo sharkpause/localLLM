@@ -5,6 +5,8 @@ from textual import events
 from .input_mode import InputMode
 from .model_picker import ModelPicker
 from .settings import Settings
+from .debug_log import debug_log
+
 from localLLM import ollama
 
 class Sidebar(Vertical):
@@ -162,6 +164,11 @@ class Sidebar(Vertical):
 
         self.app.set_focus(self.settings_container.query_one(Settings))
         self.app.update_mode(InputMode.SETTINGS)
+
+    def activate_setting(self, selected_item: str):
+        match selected_item:
+            case 'Change preprompt':
+                pass
 
     def close_settings(self, input_mode):
         if hasattr(self, 'settings_popup_container') and self.settings_container:

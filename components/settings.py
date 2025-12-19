@@ -44,14 +44,14 @@ class Settings(Container):
                 self.move_cursor(1)
                 event.stop()
             case "enter":
-                self.app.activate_setting()
+                self.app.sidebar.activate_setting(self.selected_item())
                 event.stop()
             case "escape":
-                self.app.close_settings(InputMode.SUBMIT)
+                self.app.sidebar.close_settings(InputMode.SUBMIT)
                 event.stop()
             case 't':
-                self.app.close_settings(InputMode.TYPING)
+                self.app.sidebar.close_settings(InputMode.TYPING)
                 event.stop()
             case 's':
-                self.app.close_settings(InputMode.SIDEBAR)
+                self.app.sidebar.close_settings(InputMode.SIDEBAR)
                 event.stop()
