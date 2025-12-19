@@ -53,11 +53,10 @@ class ModelPicker(Widget):
             case "down" | "j":
                 self.move_cursor(1)
             case "enter":
-                # debug_log('Model picker enter')
                 self.app.sidebar.pick_model(self.selected_model())
                 event.stop()
             case "escape":
-                self.app.close_model_picker()
+                self.app.sidebar.close_model_picker()
                 event.stop()
     
     def selected_model(self) -> str:
@@ -119,7 +118,6 @@ class Sidebar(Vertical):
         self.cursor = 0
 
         self.cursor_on = False
-        self.model_picker_popup = None
 
     def on_mount(self):
         self.refresh_list()
@@ -211,9 +209,6 @@ class Sidebar(Vertical):
 
         match item:
             case "model":
-                if self.model_picker_popup:
-                    return
-
                 self.open_model_picker()
                 self.clear_cursor()
             case "settings":
@@ -241,8 +236,7 @@ class Sidebar(Vertical):
     
     def close_model_picker(self):
         popup = getattr(self, "model_picker_popup", None)
-        if not popup:
-            return
+
         try:
             popup.remove()
         except Exception:
