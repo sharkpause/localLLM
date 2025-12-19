@@ -145,6 +145,8 @@ class ChatUI(App):
                 case 't':
                     self.clear_sidebar_cursor()
                     self.update_mode(InputMode.TYPING)
+                case 'q':
+                    exit(0)
 
         match event.key:
             case 'escape':
@@ -158,6 +160,9 @@ class ChatUI(App):
                 if self.mode == InputMode.SUBMIT:
                     self.submit_message()
                     event.prevent_default()
+            case 'q':
+                if self.mode == InputMode.SUBMIT:
+                    exit(0)
     
     def change_to_submit(self, event):
         self.update_mode(InputMode.SUBMIT)
