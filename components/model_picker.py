@@ -2,6 +2,8 @@ from textual.widget import Widget
 from textual.widgets import Static
 from textual import events
 
+from .input_mode import InputMode
+
 class ModelPicker(Widget):
     can_focus = True
 

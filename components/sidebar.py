@@ -5,6 +5,8 @@ from textual import events
 from .input_mode import InputMode
 from .model_picker import ModelPicker
 from .settings import Settings
+from .preprompt_editor import PrepromptEditor
+
 from .debug_log import debug_log
 
 from localLLM import ollama
@@ -168,15 +170,26 @@ class Sidebar(Vertical):
     def activate_setting(self, selected_item: str):
         match selected_item:
             case 'Change preprompt':
-                pass
+                self.clear_cursor()
+                self.open_preprompt_editor()
 
     def close_settings(self, input_mode):
-        if hasattr(self, 'settings_popup_container') and self.settings_container:
+        if hasattr(self, 'settings_container') and self.settings_container:
             self.settings_container.remove()
             self.settings_container = None
 
-        self.app.set_focus(self.sidebar)
+        self.app.set_focus(self)
         self.app.update_mode(input_mode)
+    
+    def open_preprompt_editor(self):
+        self.app.push_screen(
+            PrepromptEditor(),
+            callback=self.on_preprompt_closed
+        )
+
+    def on_preprompt_closed(self, saved: bool):
+        self.close_settings(InputMode.SIDEBAR)
+        self.app.update_mode(InputMode.SETTINGS)
 
     def update_model_label(self, model_name: str):
         self.items['model'] = model_name
