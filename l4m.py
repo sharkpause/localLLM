@@ -212,15 +212,16 @@ class ChatUI(App):
         self.messages.append(assistant_message)
         self.render_messages(assistant_message)
 
-        SPINNER_FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
+        # spinner_frames = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
+        spinner_frames = ['-', '\\', '|', '/']
         spinner_index = 0
         spinner_running = True
         assistant_widget = self.chat_view.children[-1]
 
         def spinner_tick():
             nonlocal spinner_index
-            assistant_widget.update(SPINNER_FRAMES[spinner_index])
-            spinner_index = (spinner_index + 1) % len(SPINNER_FRAMES)
+            assistant_widget.update(spinner_frames[spinner_index])
+            spinner_index = (spinner_index + 1) % len(spinner_frames)
 
         spinner_timer = self.set_interval(0.1, spinner_tick)
 
